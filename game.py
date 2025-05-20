@@ -6,7 +6,7 @@ import pygame as pg
 
 
 
-WIDTH, HEIGHT = 1100, 650
+WIDTH, HEIGHT = 600, 800
 DELTA = { # 辞書の作成
     pg.K_UP: (0,-5),
     pg.K_DOWN: (0,+5),
@@ -69,7 +69,7 @@ def main():
     bg_img = pg.image.load("fig/campas.jpg")    
     kk_img = pg.transform.rotozoom(pg.image.load("fig/3.png"), 0, 0.9)
     kk_rct = kk_img.get_rect()
-    kk_rct.center = 300, 200
+    kk_rct.center = 300, 700
     """
     # 爆弾初期化
     bb_imgs, bb_accs = init_bb_imgs()
@@ -105,7 +105,7 @@ def main():
         for key, mv in DELTA.items():
             if key_lst[key]:
                 sum_mv[0] += mv[0] # 左右方向
-                sum_mv[1] += mv[1] # 上下方向
+                #sum_mv[1] += mv[1] # 上下方向
         """"
         if key_lst[pg.K_UP]:
             sum_mv[1] -= 5
