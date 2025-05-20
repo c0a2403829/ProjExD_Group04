@@ -8,8 +8,8 @@ import pygame as pg
 
 WIDTH, HEIGHT = 1100, 650
 DELTA = { # 辞書の作成
-    pg.K_UP: (0,-5),
-    pg.K_DOWN: (0,+5),
+    # pg.K_UP: (0,-5),
+    # pg.K_DOWN: (0,+5),
     pg.K_LEFT: (-5,0),
     pg.K_RIGHT: (+5,0),
 }
@@ -71,7 +71,7 @@ def main():
     kk_base_img=pg.image.load("fig/3.png")
     kk_img = pg.transform.rotozoom(kk_base_img, 0, scale)
     kk_rct = kk_img.get_rect()
-    kk_rct.center = 300, 200
+    kk_rct.center = 550, 500
     """
     # 爆弾初期化
     bb_imgs, bb_accs = init_bb_imgs()
@@ -91,6 +91,7 @@ def main():
                 return
         screen.blit(bg_img, [0, 0]) 
 
+        #右上の時間表示count up (以下四文、消していいよ)
         font = pg.font.Font(None, 50) 
         elapsed_time = tmr // 50 
         time_text = font.render(f"Time: {elapsed_time}s", True, (255, 255, 255))  
@@ -110,30 +111,32 @@ def main():
         sum_mv[0] *= speed
         sum_mv[1] *= speed
 
-        # elapsed_sec = tmr // 50
-        scale = 0.9 + 0.1 * (elapsed_time // 10)  # 10秒ごとにサイズアップ
+        elapsed_sec = tmr // 50
+        scale = 0.9 + 0.2 * (elapsed_sec // 20)  # 10秒ごとにサイズアップ
         kk_img = pg.transform.rotozoom(kk_base_img, 0, scale)
+        kk_rct = kk_img.get_rect(center=kk_rct.center) 
         
-        # kk_rct = kk_img.get_rect(center=kk_rct.center)
-        
-        # if elapsed_time % 10 == 0:
-        #     sum_mv[0]+=5
-        
+
+        # obj_wall1 = pg.transform.rotozoom(obj_base_wall1, 0, scale)
+        # obj_wall2 = pg.transform.rotozoom(obj_base_wall2, 0, scale)
+        # obj_wall3 = pg.transform.rotozoom(obj_base_wall3, 0, scale)
+        # obj_wall1_rect = obj_wall1.get_rect(center=obj_wall1_rect.center) 
+        # obj_wall2_rect = obj_wall2.get_rect(center=obj_wall2_rect.center) 
+        # obj_wall3_rect = obj_wall3.get_rect(center=obj_wall3_rect.center) 
+
+        speed = 1 + elapsed_sec // 10
+
+    
 
         kk_rct.move_ip(sum_mv) # こうかとんの移動
         if check_bound(kk_rct) != (True, True): # 画面外だったら
             kk_rct.move_ip(-sum_mv[0], -sum_mv[1]) # 画面内に戻す
         screen.blit(kk_img, kk_rct)
       
-        # #bb_rct.move_ip(avx, avy) # 爆弾の移動 
-        # yoko, tate = check_bound(bb_rct)
-        # if not yoko: # 左右どちらかにはみ出ていたら
-        #     vx *= -1
-        # if not tate: # 上下どちらかにはみ出ていたら
-        #     vy *= -1
+      
         
-        #screen.blit(bb_img, bb_rct) # 爆弾の表示
-        speed = 1 + elapsed_time // 10
+       
+        
         pg.display.update()
         tmr += 1
         clock.tick(50)
