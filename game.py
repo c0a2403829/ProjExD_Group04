@@ -66,8 +66,10 @@ def main():
     screen = pg.display.set_mode((WIDTH, HEIGHT))
 
     # こうかとん初期化
-    bg_img = pg.image.load("fig/campas.jpg")    
-    kk_img = pg.transform.rotozoom(pg.image.load("fig/3.png"), 0, 0.9)
+    bg_img = pg.image.load("fig/campas.jpg")   
+    scale=0.9
+    kk_base_img=pg.image.load("fig/3.png")
+    kk_img = pg.transform.rotozoom(kk_base_img, 0, scale)
     kk_rct = kk_img.get_rect()
     kk_rct.center = 300, 200
     """
@@ -82,46 +84,47 @@ def main():
     """
     clock = pg.time.Clock()
     tmr = 0
+    speed = 1 
     while True:
         for event in pg.event.get():
             if event.type == pg.QUIT: 
                 return
         screen.blit(bg_img, [0, 0]) 
-        """
-         # 爆弾の拡大、加速
-        avx = vx*bb_accs[min(tmr//500, 9)]
-        avy = vy*bb_accs[min(tmr//500, 9)]
-        bb_img = bb_imgs[min(tmr//500, 9)]
-        bb_img.set_colorkey((0, 0, 0))
 
-         # こうかとんRectと爆弾Rectが重なっていたら
-        if kk_rct.colliderect(bb_rct):
-            gameover(screen)
-            time.sleep(5)
-            return
-        """
+        font = pg.font.Font(None, 50) 
+        elapsed_time = tmr // 50 
+        time_text = font.render(f"Time: {elapsed_time}s", True, (255, 255, 255))  
+        screen.blit(time_text, (50, 30))
+
+        # if kk_rct.colliderect(bb_rct):
+        #     gameover(screen)
+        #     time.sleep(5)
+        #     return
+        # """
         key_lst = pg.key.get_pressed()
         sum_mv = [0, 0]
         for key, mv in DELTA.items():
             if key_lst[key]:
                 sum_mv[0] += mv[0] # 左右方向
                 sum_mv[1] += mv[1] # 上下方向
-        """"
-        if key_lst[pg.K_UP]:
-            sum_mv[1] -= 5
-        if key_lst[pg.K_DOWN]:
-            sum_mv[1] += 5
-        if key_lst[pg.K_LEFT]:
-            sum_mv[0] -= 5
-        if key_lst[pg.K_RIGHT]:
-            sum_mv[0] += 5
-        """
+        sum_mv[0] *= speed
+        sum_mv[1] *= speed
+
+        # elapsed_sec = tmr // 50
+        scale = 0.9 + 0.1 * (elapsed_time // 10)  # 10秒ごとにサイズアップ
+        kk_img = pg.transform.rotozoom(kk_base_img, 0, scale)
+        
+        # kk_rct = kk_img.get_rect(center=kk_rct.center)
+        
+        # if elapsed_time % 10 == 0:
+        #     sum_mv[0]+=5
+        
 
         kk_rct.move_ip(sum_mv) # こうかとんの移動
         if check_bound(kk_rct) != (True, True): # 画面外だったら
             kk_rct.move_ip(-sum_mv[0], -sum_mv[1]) # 画面内に戻す
         screen.blit(kk_img, kk_rct)
-        """"""
+      
         # #bb_rct.move_ip(avx, avy) # 爆弾の移動 
         # yoko, tate = check_bound(bb_rct)
         # if not yoko: # 左右どちらかにはみ出ていたら
@@ -130,6 +133,7 @@ def main():
         #     vy *= -1
         
         #screen.blit(bb_img, bb_rct) # 爆弾の表示
+        speed = 1 + elapsed_time // 10
         pg.display.update()
         tmr += 1
         clock.tick(50)
