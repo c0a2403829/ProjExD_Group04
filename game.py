@@ -2,6 +2,7 @@ import os
 import random
 import sys
 import time
+import pygame.mixer
 import pygame as pg
 
 
@@ -29,19 +30,6 @@ def check_bound(rct: pg.Rect) -> tuple[bool, bool]:
         tate = False
     return yoko, tate
 
-def gameover(screen: pg.Surface) -> None: # ゲームオーバー機能
-    bg_rct = pg.Surface((WIDTH, HEIGHT))
-    pg.draw.rect(bg_rct,(0,0,0),(0,0,WIDTH,HEIGHT))
-    bg_rct.set_alpha(150)
-    screen.blit(bg_rct,[0, 0])
-    fonto = pg.font.Font(None, 70)
-    txt = fonto.render("Game Over",True, (255, 255, 255))
-    screen.blit(txt, [450, 325])
-    ck_img =pg.image.load("fig/4.png")
-    screen.blit(ck_img,[400,325])
-    screen.blit(ck_img,[720,325])
-    pg.display.update()
-
 def init_bb_imgs() -> tuple[list[pg.Surface], list[int]]: # 爆弾拡大、加速機能
     b_img = []
     bb_accs = [a for a in range(1, 11)]
@@ -50,56 +38,104 @@ def init_bb_imgs() -> tuple[list[pg.Surface], list[int]]: # 爆弾拡大、加�
         pg.draw.circle(bb_img, (255, 0, 0), (10*r, 10*r), 10*r)
         b_img.append(bb_img)
     return b_img, bb_accs
-"""
-def get_kk_img(sum_mv: tuple[int, int]) -> pg.Surface:
-    kk_dict = {
-        (0, -5): kk_img = pg.transform.rotozoom(pg.image.load("fig/3.png"), 270, 0.9),
-        (+5, -5): kk_img = pg.transform.rotozoom(pg.image.load("fig/3.png"), 315, 0.9),
-        (+5, 0): kk_img = pg.transform.rotozoom(pg.image.load("fig/3.png"), 0, 0.9),
-    }
-    if sum_mv == [0, -5]:
-        return
-"""
+
+def game_start(screen: pg.Surface):
+
+    """
+    ゲームスタート画面。
+    スタート画面BGM再生。
+    エンターキーでスタート。
+    """
+    bg = pg.image.load("fig/start.jpg")
+    title_font = pg.font.SysFont("impact", 80)
+    text_font = pg.font.SysFont("msgothic", 40)
+    title_txt = title_font.render("Survive Kokaton", True, (35,91,200))
+    text = text_font.render("Push to Enter", True, (35,91,200))
+
+    pygame.mixer.init() #初期化
+    pygame.mixer.music.load("fig/Snow_Drop.mp3") #読み込み
+    pygame.mixer.music.play(-1) #スタート画面BGM再生
+
+    while True:
+        screen.blit(bg, (-570, 0))  # 背景画像貼り付け
+        screen.blit(title_txt, (WIDTH//2 - title_txt.get_width()//2, HEIGHT//2 - 150)) 
+        screen.blit(text, (WIDTH//2 - text.get_width()//2, HEIGHT - 200))  # テキスト表示
+        pg.display.update()
+
+        for event in pg.event.get():
+            if event.type == pg.QUIT:
+                pg.quit()
+                sys.exit()
+            elif event.type == pg.KEYDOWN and event.key == pg.K_RETURN:
+                pygame.mixer.music.fadeout(3) #スタート画面BGM終了
+                return
+            
+def game_clear(screen: pg.Surface):
+
+    """
+    ゲームクリア画面。
+    エンターキーでゲーム終了。
+    """
+    bg = pg.image.load("fig/clear.jpg")
+    title_font = pg.font.SysFont("impact", 90)
+    text_font = pg.font.SysFont("msgothic", 50)
+    title_txt = title_font.render("GAME CLEAR!!", True, (231,17,25))
+    text = text_font.render("Push Enter to End", True, (231,17,25))
+
+    pygame.mixer.init() #初期化
+    pygame.mixer.music.load("fig/勝利のテーマ.mp3") #クリアBGM読み込み
+    pygame.mixer.music.play(-1) #クリアBGM再生
+
+    while True:
+        screen.blit(bg, (-570, 0))  # 背景画像貼り付け
+        screen.blit(title_txt, (WIDTH//2 - title_txt.get_width()//2, HEIGHT//2 - 150)) 
+        screen.blit(text, (WIDTH//2 - text.get_width()//2, HEIGHT - 200))  # テキスト表示
+        pg.display.update()
+        
+        for event in pg.event.get():
+            if event.type == pg.QUIT:
+                pg.quit()
+                sys.exit()
+            elif event.type == pg.KEYDOWN and event.key == pg.K_RETURN:
+                return
+
 
 def main():
-    pg.display.set_caption("逃げろ！こうかとん")
+    pg.display.set_caption("生き延びろ！こうかとん")
     screen = pg.display.set_mode((WIDTH, HEIGHT))
+
+    game_start(screen)  # スタート画面の呼び出し
+    start_time = time.time()  # ゲーム開始時刻を記録
 
     # こうかとん初期化
     bg_img = pg.image.load("fig/campas.jpg")    
     kk_img = pg.transform.rotozoom(pg.image.load("fig/3.png"), 0, 0.9)
     kk_rct = kk_img.get_rect()
+
     kk_rct.center = 300, 700
-    """
-    # 爆弾初期化
-    bb_imgs, bb_accs = init_bb_imgs()
-    bb_img = pg.Surface((20, 20))
-    pg.draw.circle(bb_img, (255, 0, 0), (10, 10), 10)
-    bb_rct = bb_img.get_rect()
-    bb_rct.center = random.randint(0, WIDTH), random.randint(0, HEIGHT)
-    bb_img.set_colorkey((0, 0, 0))
-    vx, vy = +5, +5 # 爆弾の速度
-    """
+
+    pygame.mixer.init() #初期化
+    pygame.mixer.music.load("fig/The_Beautiful_Haven_Type_I.mp3") #読み込み
+    pygame.mixer.music.play(1) #ゲーム画面BGM再生
+    
     clock = pg.time.Clock()
     tmr = 0
     while True:
+
+        elapsed_time = time.time() - start_time
+        survive_time = max(0, int(180 - elapsed_time)) #カウントダウン
+
+        if survive_time <= 0:
+             game_clear(screen)#ゲームクリア画面呼び出し
+             time.sleep(1)
+             return  # ゲーム終了
+        
         for event in pg.event.get():
             if event.type == pg.QUIT: 
                 return
-        screen.blit(bg_img, [0, 0]) 
-        """
-         # 爆弾の拡大、加速
-        avx = vx*bb_accs[min(tmr//500, 9)]
-        avy = vy*bb_accs[min(tmr//500, 9)]
-        bb_img = bb_imgs[min(tmr//500, 9)]
-        bb_img.set_colorkey((0, 0, 0))
-
-         # こうかとんRectと爆弾Rectが重なっていたら
-        if kk_rct.colliderect(bb_rct):
-            gameover(screen)
-            time.sleep(5)
-            return
-        """
+            
+        screen.blit(bg_img, [-570, 0]) 
+        
         key_lst = pg.key.get_pressed()
         sum_mv = [0, 0]
         for key, mv in DELTA.items():
@@ -121,13 +157,13 @@ def main():
         if check_bound(kk_rct) != (True, True): # 画面外だったら
             kk_rct.move_ip(-sum_mv[0], -sum_mv[1]) # 画面内に戻す
         screen.blit(kk_img, kk_rct)
-        """"""
-        # #bb_rct.move_ip(avx, avy) # 爆弾の移動 
-        # yoko, tate = check_bound(bb_rct)
-        # if not yoko: # 左右どちらかにはみ出ていたら
-        #     vx *= -1
-        # if not tate: # 上下どちらかにはみ出ていたら
-        #     vy *= -1
+
+        """
+        右上にカウントダウン表示
+        """
+        timer_font = pg.font.SysFont("impact", 40)
+        timer_txt = timer_font.render(f"Survive for {survive_time} more seconds!", True, (244,229,17))
+        screen.blit(timer_txt, (70, 750))
         
         #screen.blit(bb_img, bb_rct) # 爆弾の表示
         pg.display.update()
@@ -140,93 +176,3 @@ if __name__ == "__main__":
     main()
     pg.quit()
     sys.exit()
-# import os
-# import random
-# import sys
-# import time
-# import pygame as pg
-
-
-# WIDTH = 650  # ゲームウィンドウの幅
-# HEIGHT = 110  # ゲームウィンドウの高さ
-# NUM_OF_BOMBS = 5  # 爆弾の個数
-# os.chdir(os.path.dirname(os.path.abspath(__file__)))
-
-
-# class Bird:
-#     """
-#     ゲームキャラクター（こうかとん）に関するクラス
-#     """
-#     delta = {  # 押下キーと移動量の辞書
-#         pg.K_UP: (0, -5),
-#         pg.K_DOWN: (0, +5),
-#         pg.K_LEFT: (-5, 0),
-#         pg.K_RIGHT: (+5, 0),
-#     }
-#     img0 = pg.transform.rotozoom(pg.image.load("fig/campus.jpg"), 0, 0.9)
-#     img = pg.transform.flip(img0, True, False)  # デフォルトのこうかとん（右向き）
-#     imgs = {  # 0度から反時計回りに定義
-#         (+5, 0): img,  # 右
-#         (+5, -5): pg.transform.rotozoom(img, 45, 0.9),  # 右上
-#         (0, -5): pg.transform.rotozoom(img, 90, 0.9),  # 上
-#         (-5, -5): pg.transform.rotozoom(img0, -45, 0.9),  # 左上
-#         (-5, 0): img0,  # 左
-#         (-5, +5): pg.transform.rotozoom(img0, 45, 0.9),  # 左下
-#         (0, +5): pg.transform.rotozoom(img, -90, 0.9),  # 下
-#         (+5, +5): pg.transform.rotozoom(img, -45, 0.9),  # 右下
-#     }
-
-#     def __init__(self, xy: tuple[int, int]):
-#         """
-#         こうかとん画像Surfaceを生成する
-#         引数 xy：こうかとん画像の初期位置座標タプル
-#         """
-#         self.img = __class__.imgs[(+5, 0)]
-#         self.rct: pg.Rect = self.img.get_rect()
-#         self.rct.center = xy
-
-#     def change_img(self, num: int, screen: pg.Surface):
-#         """
-#         こうかとん画像を切り替え，画面に転送する
-#         引数1 num：こうかとん画像ファイル名の番号
-#         引数2 screen：画面Surface
-#         """
-#         self.img = pg.transform.rotozoom(pg.image.load(f"fig/{num}.png"), 0, 0.9)
-#         screen.blit(self.img, self.rct)
-
-#     def update(self, key_lst: list[bool], screen: pg.Surface):
-#         """
-#         押下キーに応じてこうかとんを移動させる
-#         引数1 key_lst：押下キーの真理値リスト
-#         引数2 screen：画面Surface
-#         """
-#         sum_mv = [0, 0]
-#         for k, mv in __class__.delta.items():
-#             if key_lst[k]:
-#                 sum_mv[0] += mv[0]
-#                 sum_mv[1] += mv[1]
-#         self.rct.move_ip(sum_mv)
-#         if check_bound(self.rct) != (True, True):
-#             self.rct.move_ip(-sum_mv[0], -sum_mv[1])
-#         if not (sum_mv[0] == 0 and sum_mv[1] == 0):
-#             self.img = __class__.imgs[tuple(sum_mv)]
-#         screen.blit(self.img, self.rct)
-
-      
-# def main():
-#     pg.display.set_caption("たたかえ！こうかとん")
-#     screen = pg.display.set_mode((WIDTH, HEIGHT))    
-#     bg_img = pg.image.load("fig/campus.jpg")
-#     bird = Bird((300, 200))
-#     tmr = 0
-#     while True:
-        
-        
-#         pg.display.update()
-
-
-# if __name__ == "__main__":
-#     pg.init()
-#     main()
-#     pg.quit()
-#     sys.exit()
