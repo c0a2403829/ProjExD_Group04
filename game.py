@@ -53,7 +53,7 @@ class Gameover:
 
         self.time_fonto = pg.font.Font(None, 50) # 文字列表示
         self.time_txt = self.time_fonto.render(f"{survive_time} seconds left",True, (255, 255, 255)) 
-        
+
         self.kk_img1 = pg.image.load("fig/8.png") # こうかとん(左)表示 
         self.kk_img1 = pg.transform.rotozoom(pg.image.load("fig/8.png"), 0, 2.0)
         self.kk_rct1 = self.kk_img1.get_rect()
