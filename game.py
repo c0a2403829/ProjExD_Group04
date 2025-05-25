@@ -132,7 +132,7 @@ class Juice(Item):
 
     def apply_effect(self, player_rect, now, state):
         if self.active and self.rect.colliderect(player_rect):
-            state["speed"] = 6
+            state["speed"] = 7
             state["boost_timer"] = now + 5000
             self.active = False
 
@@ -153,7 +153,7 @@ class Mirror(Item):
     def apply_effect(self, player_rect, now, state):
         if self.active and self.rect.colliderect(player_rect):
             state["is_mirrored"] = True
-            state["mirror_timer"] = now + 3000  # 5秒後に戻す
+            state["mirror_timer"] = now + 4000  # 4秒後に戻す
             self.active = False
 
 class Shield(Item):
@@ -181,11 +181,19 @@ def main():
     screen = pg.display.set_mode((WIDTH, HEIGHT))
 
     # こうかとん初期化
+    sum_mv = [0,0]
     bg_img = pg.image.load("fig/campas.jpg")    
-    kk_img = pg.transform.rotozoom(pg.image.load("fig/3.png"), 0, 0.9)
+    kk_img0 = pg.transform.rotozoom(pg.image.load("fig/3.png"), 0, 0.9)
+    kk_img = kk_img0 if sum_mv[0] >= 0 else pg.transform.flip(kk_img0, True, False)
     kk_rct = kk_img.get_rect()
     kk_rct.center = 300, 700
+    reverse_icon = pg.image.load("fig/reverse.png").convert_alpha()
+    reverse_icon = pg.transform.scale(reverse_icon, (40, 40))
+    shield_icon = pg.image.load("fig/shield.png").convert_alpha()
+    shield_icon = pg.transform.scale(shield_icon, (35, 35))
+    barrier_img = pg.transform.scale(pg.image.load("fig/barrier.png"), (90, 80)) 
     items = []
+
     # 状態管理用の辞書（ブースト/鈍足/ミラーなど共通）
     state = {
     "speed": 3,
@@ -207,7 +215,21 @@ def main():
                 return
         screen.blit(bg_img, [0, 0]) 
         now = pg.time.get_ticks()
-         # 一定時間後に速度を元に戻す
+
+        # こうかとんの操作
+        key_lst = pg.key.get_pressed()
+        sum_mv = [0, 0]
+        for key, mv in DELTA.items():
+            if key_lst[key]:
+                sum_mv[0] += mv[0] * state["speed"]# 左右方向
+                if state["is_mirrored"]:
+                    sum_mv[0] = -sum_mv[0]  # 反転
+        kk_rct.move_ip(sum_mv) # 移動
+        if check_bound(kk_rct) != (True, True): # 画面外だったら
+            kk_rct.move_ip(-sum_mv[0], -sum_mv[1]) # 画面内に戻す
+        screen.blit(kk_img, kk_rct)
+
+        # 一定時間後に速度を元に戻す
         if state["boost_timer"] != 0 and now > state["boost_timer"]:
             state["speed"] = 3
             state["boost_timer"] = 0
@@ -217,6 +239,37 @@ def main():
         if state["mirror_timer"] != 0 and now > state["mirror_timer"]:
             state["is_mirrored"] = False
             state["mirror_timer"] = 0
+        
+        # スピードアップ中効果トンをこうかとんを赤くする
+        draw_img = kk_img.copy()
+        if state["speed"] > 3:  # 速度アップ中
+            red_overlay = pg.Surface(kk_img.get_size())
+            red_overlay.fill((120, 0, 0))  # 赤色成分
+            draw_img.blit(red_overlay, (0, 0), special_flags=pg.BLEND_RGB_ADD)
+        screen.blit(draw_img, kk_rct)
+
+        # スロウ中に画面を暗くする 
+        if state["speed"] < 3:        
+            overlay = pg.Surface((WIDTH, HEIGHT))
+            overlay.fill((0, 80, 255))
+            overlay.set_alpha(40)    # 透明度
+            screen.blit(overlay, (0, 0))
+        
+        # 反転中にアイコンを表示する
+        if state["is_mirrored"]:
+            screen.blit(reverse_icon, (10, 10))
+        if state["mirror_timer"] > now:
+            font = pg.font.Font(None, 40)
+            remain = (state["mirror_timer"] - now) // 1000
+            txt = font.render(f"{remain}", True, (255,255,255))
+            screen.blit(txt, (50, 40))
+
+        # シールド発動中、バリアとシールドアイコン表示
+        if state["has_shield"]:
+             screen.blit(shield_icon, (WIDTH - 45, 10))
+             barrier_rect = barrier_img.get_rect(center=kk_rct.center)
+             screen.blit(barrier_img, barrier_rect)
+
         # 一定時間ごとにランダムなアイテムを生成
         if now - last_spawn_time > SPAWN_INTERVAL:
             x = random.randint(0, WIDTH - 50)
@@ -234,27 +287,7 @@ def main():
             # elif item_type == 'hamburger':
             #     items.append(Hamburger(x, -40))
             last_spawn_time = now
-    
-        # こうかとんの操作
-        key_lst = pg.key.get_pressed()
-        sum_mv = [0, 0]
-        for key, mv in DELTA.items():
-            if key_lst[key]:
-                sum_mv[0] += mv[0] * state["speed"]# 左右方向
-                if state["is_mirrored"]:
-                    sum_mv[0] = -sum_mv[0]  # 反転
-        kk_rct.move_ip(sum_mv) # 移動
-        if check_bound(kk_rct) != (True, True): # 画面外だったら
-            kk_rct.move_ip(-sum_mv[0], -sum_mv[1]) # 画面内に戻す
-        screen.blit(kk_img, kk_rct)
 
-        if state["has_shield"]:
-            # s_img = pg.transform.scale(pg.image.load("fig/shield.png").convert_alpha(),(50,45))
-            # s_rct = s_img.get_rect()
-            # screen.blit(s_img, s_rct)
-            font = pg.font.Font(None, 40)
-            txt = font.render("SHIELD ON", True, (255, 255, 0))
-            screen.blit(txt, (10, 10))
 
         for item in items:
             item.update()
