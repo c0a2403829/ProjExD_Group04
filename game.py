@@ -43,66 +43,6 @@ def gameover(screen: pg.Surface) -> None: # ゲームオーバー機能
     pg.display.update()
 
 
-class Bird:
-    """
-    ゲームキャラクター（こうかとん）に関するクラス
-    """
-    delta = {  # 押下キーと移動量の辞書
-        pg.K_UP: (0, -5),
-        pg.K_DOWN: (0, +5),
-        pg.K_LEFT: (-5, 0),
-        pg.K_RIGHT: (+5, 0),
-    }
-
-    def __init__(self, xy: tuple[int, int]):
-        """
-        こうかとん画像Surfaceを生成する
-        引数 xy：こうかとん画像の初期位置座標タプル
-        """
-        self.img = pg.image.load("fig/3.png")
-        self.rct: pg.Rect = self.img.get_rect()
-        self.rct.center = xy
-
-    def update(self, key_lst: list[bool], screen: pg.Surface):
-        """
-        押下キーに応じてこうかとんを移動させる
-        引数1 key_lst：押下キーの真理値リスト
-        引数2 screen：画面Surface
-        """
-        sum_mv = [0, 0]
-        for k, mv in __class__.delta.items():
-            if key_lst[k]:
-                sum_mv[0] += mv[0]
-                sum_mv[1] += mv[1]
-        self.rct.move_ip(sum_mv)
-        if check_bound(self.rct) != (True, True):
-            self.rct.move_ip(-sum_mv[0], -sum_mv[1])
-        if not (sum_mv[0] == 0 and sum_mv[1] == 0):
-            self.img = __class__.imgs[tuple(sum_mv)]
-        screen.blit(self.img, self.rct)
-
-
-# class Player:
-#     def __init__(self, x, y):
-#         self.img = pg.image.load("fig/3.png")
-#         self.rct: pg.Rect = self.img.get_rect()
-#         self.rct.center = x,y
-#         self.base_speed = 5
-#         self.speed = self.base_speed
-#         self.boost_timer = 0
-
-#     def update(self):
-#         # スピードアップ効果の時間管理
-#         if self.boost_timer > 0:
-#             self.boost_timer -= clock.get_time()
-#             if self.boost_timer <= 0:
-#                 self.speed = self.base_speed
-
-#     def boost(self, duration_ms):
-#         self.speed = self.base_speed * 2
-#         self.boost_timer = duration_ms
-
-
 class Item:
     """
     アイテムに関するクラス
