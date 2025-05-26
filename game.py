@@ -7,6 +7,7 @@ import pygame as pg
 
 
 WIDTH, HEIGHT = 1100, 650
+WALL_SPEED = 3
 DELTA = { # 辞書の作成
     pg.K_UP: (0,-5),
     pg.K_DOWN: (0,+5),
@@ -60,6 +61,69 @@ def get_kk_img(sum_mv: tuple[int, int]) -> pg.Surface:
     if sum_mv == [0, -5]:
         return
 """
+class Wall:
+    def __init__(self, x, y, image_path, form="obj_wall1", speed=WALL_SPEED, walls=[]):
+        """
+        シンプルな画像一枚と縦に二枚重ねたとき横に二枚並べたときの三種類の大きさ調整
+        画像の情報取得
+        基本情報の設定
+        壁同士が重ならない位置に壁を配置
+        """
+        self.image = pg.image.load(image_path)
+        
+        if form == "obj_wall1":
+            self.image = pg.transform.scale(self.image, (self.image.get_width() // 4, self.image.get_height() // 4))
+        elif form == "obj_wall2":
+            self.image = pg.transform.scale(self.image, (self.image.get_width() // 8, self.image.get_height() // 4))
+        elif form == "obj_wall3":
+            self.image = pg.transform.scale(self.image, (self.image.get_width() // 4, self.image.get_height() // 8))
+
+        self.form = form
+        self.speed = speed
+        self.rect = self.image.get_rect()
+
+        self.rect.topleft = self.safe_position(x, y, walls)
+    
+    def safe_position(self, x, y, walls):
+        """
+        壁同士の出力場所の重複を防止
+        coolliderect(a)はaと座標が重なったらループを抜ける、
+        抜けた場合ランダムに座標を付けなおす
+        戻り値：ランダムなx,y座標
+        """
+        trying = 100
+        for i in range(trying):
+            tr_rect = self.rect.copy()
+            tr_rect.topleft = (x, y)
+            coll = False
+            for w in walls:
+                if tr_rect.colliderect(w.rect):
+                    coll = True
+                    break
+            if not coll:
+                return x, y
+            x = random.randint(0,WIDTH - self.rect.width)
+            y = random.randint(-500, -50)
+        return x, y
+    
+    def move(self, walls):
+        """
+        壁の位置を下に下げていき画面外に消えたときに画面上部のランダムな位置からまた落ち始める
+        """
+        self.rect.y += self.speed
+        if self.rect.y > HEIGHT:
+            self.rect.topleft = self.safe_position(random.randint(0, WIDTH - self.rect.width), random.randint(-500, -50), walls)
+
+    def draw(self, screen):
+        """
+        wall2,wall3をそれぞれ、画像を縦、横に並べたものにする
+        """
+        screen.blit(self.image, self.rect)
+        if self.form == "obj_wall2":
+            screen.blit(self.image, (self.rect.x, self.rect.y + self.image.get_height()))
+        elif self.form =="obj_wall3":
+            screen.blit(self.image, (self.rect.x + self.image.get_width(), self.rect.y))
+            
 
 def main():
     pg.display.set_caption("逃げろ！こうかとん")
@@ -70,6 +134,13 @@ def main():
     kk_img = pg.transform.rotozoom(pg.image.load("fig/3.png"), 0, 0.9)
     kk_rct = kk_img.get_rect()
     kk_rct.center = 300, 200
+
+    walls =[]
+    wall_type = ["obj_wall1", "obj_wall2", "obj_wall3"]
+    random.shuffle(wall_type)
+    for i in range(5):  #壁の枚数を設定
+        walls.append(Wall(random.randint(0, WIDTH), random.randint(-500, -50), "fig/wall.png", wall_type[i % len(wall_type)], walls=walls))
+        # 壁枚数分のwallオブジェクトを生成し、ランダムな壁をwallsリストに追加
     """
     # 爆弾初期化
     bb_imgs, bb_accs = init_bb_imgs()
@@ -130,6 +201,10 @@ def main():
         #     vy *= -1
         
         #screen.blit(bb_img, bb_rct) # 爆弾の表示
+        for wall in walls:
+            wall.move(walls)
+            wall.draw(screen)
+            
         pg.display.update()
         tmr += 1
         clock.tick(50)
@@ -140,93 +215,3 @@ if __name__ == "__main__":
     main()
     pg.quit()
     sys.exit()
-# import os
-# import random
-# import sys
-# import time
-# import pygame as pg
-
-
-# WIDTH = 650  # ゲームウィンドウの幅
-# HEIGHT = 110  # ゲームウィンドウの高さ
-# NUM_OF_BOMBS = 5  # 爆弾の個数
-# os.chdir(os.path.dirname(os.path.abspath(__file__)))
-
-
-# class Bird:
-#     """
-#     ゲームキャラクター（こうかとん）に関するクラス
-#     """
-#     delta = {  # 押下キーと移動量の辞書
-#         pg.K_UP: (0, -5),
-#         pg.K_DOWN: (0, +5),
-#         pg.K_LEFT: (-5, 0),
-#         pg.K_RIGHT: (+5, 0),
-#     }
-#     img0 = pg.transform.rotozoom(pg.image.load("fig/campus.jpg"), 0, 0.9)
-#     img = pg.transform.flip(img0, True, False)  # デフォルトのこうかとん（右向き）
-#     imgs = {  # 0度から反時計回りに定義
-#         (+5, 0): img,  # 右
-#         (+5, -5): pg.transform.rotozoom(img, 45, 0.9),  # 右上
-#         (0, -5): pg.transform.rotozoom(img, 90, 0.9),  # 上
-#         (-5, -5): pg.transform.rotozoom(img0, -45, 0.9),  # 左上
-#         (-5, 0): img0,  # 左
-#         (-5, +5): pg.transform.rotozoom(img0, 45, 0.9),  # 左下
-#         (0, +5): pg.transform.rotozoom(img, -90, 0.9),  # 下
-#         (+5, +5): pg.transform.rotozoom(img, -45, 0.9),  # 右下
-#     }
-
-#     def __init__(self, xy: tuple[int, int]):
-#         """
-#         こうかとん画像Surfaceを生成する
-#         引数 xy：こうかとん画像の初期位置座標タプル
-#         """
-#         self.img = __class__.imgs[(+5, 0)]
-#         self.rct: pg.Rect = self.img.get_rect()
-#         self.rct.center = xy
-
-#     def change_img(self, num: int, screen: pg.Surface):
-#         """
-#         こうかとん画像を切り替え，画面に転送する
-#         引数1 num：こうかとん画像ファイル名の番号
-#         引数2 screen：画面Surface
-#         """
-#         self.img = pg.transform.rotozoom(pg.image.load(f"fig/{num}.png"), 0, 0.9)
-#         screen.blit(self.img, self.rct)
-
-#     def update(self, key_lst: list[bool], screen: pg.Surface):
-#         """
-#         押下キーに応じてこうかとんを移動させる
-#         引数1 key_lst：押下キーの真理値リスト
-#         引数2 screen：画面Surface
-#         """
-#         sum_mv = [0, 0]
-#         for k, mv in __class__.delta.items():
-#             if key_lst[k]:
-#                 sum_mv[0] += mv[0]
-#                 sum_mv[1] += mv[1]
-#         self.rct.move_ip(sum_mv)
-#         if check_bound(self.rct) != (True, True):
-#             self.rct.move_ip(-sum_mv[0], -sum_mv[1])
-#         if not (sum_mv[0] == 0 and sum_mv[1] == 0):
-#             self.img = __class__.imgs[tuple(sum_mv)]
-#         screen.blit(self.img, self.rct)
-
-      
-# def main():
-#     pg.display.set_caption("たたかえ！こうかとん")
-#     screen = pg.display.set_mode((WIDTH, HEIGHT))    
-#     bg_img = pg.image.load("fig/campus.jpg")
-#     bird = Bird((300, 200))
-#     tmr = 0
-#     while True:
-        
-        
-#         pg.display.update()
-
-
-# if __name__ == "__main__":
-#     pg.init()
-#     main()
-#     pg.quit()
-#     sys.exit()
