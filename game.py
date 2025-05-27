@@ -5,14 +5,14 @@ import time
 import pygame as pg
 
 
-
+DELTA = {  # 押下キーと移動量の辞書
+        pg.K_UP: (0, -5),
+        pg.K_DOWN: (0, +5),
+        pg.K_LEFT: (-5, 0),
+        pg.K_RIGHT: (+5, 0),
+    }
 WIDTH, HEIGHT = 600, 800
-DELTA = { # 辞書の作成
-    pg.K_UP: (0,-5),
-    pg.K_DOWN: (0,+5),
-    pg.K_LEFT: (-5,0),
-    pg.K_RIGHT: (+5,0),
-}
+clock = pg.time.Clock()
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
 def check_bound(rct: pg.Rect) -> tuple[bool, bool]:
@@ -42,94 +42,199 @@ def gameover(screen: pg.Surface) -> None: # ゲームオーバー機能
     screen.blit(ck_img,[720,325])
     pg.display.update()
 
-def init_bb_imgs() -> tuple[list[pg.Surface], list[int]]: # 爆弾拡大、加速機能
-    b_img = []
-    bb_accs = [a for a in range(1, 11)]
-    for r in range(1, 11):
-        bb_img = pg.Surface((20*r, 20*r))
-        pg.draw.circle(bb_img, (255, 0, 0), (10*r, 10*r), 10*r)
-        b_img.append(bb_img)
-    return b_img, bb_accs
-"""
-def get_kk_img(sum_mv: tuple[int, int]) -> pg.Surface:
-    kk_dict = {
-        (0, -5): kk_img = pg.transform.rotozoom(pg.image.load("fig/3.png"), 270, 0.9),
-        (+5, -5): kk_img = pg.transform.rotozoom(pg.image.load("fig/3.png"), 315, 0.9),
-        (+5, 0): kk_img = pg.transform.rotozoom(pg.image.load("fig/3.png"), 0, 0.9),
-    }
-    if sum_mv == [0, -5]:
-        return
-"""
+
+class Item:
+    """
+    アイテムに関するクラス
+    """
+    def __init__(self, x, y, image_path, fall_speed=5):
+        self.image = pg.transform.scale(pg.image.load(image_path).convert_alpha(),(50,45))
+        self.rect = self.image.get_rect(topleft=(x, y))
+        self.active = True
+        self.fall_speed = fall_speed
+
+    def update(self):
+        """アイテムを下に移動させる"""
+        if self.active:
+            self.rect.y += self.fall_speed
+
+    def apply_effect(self ):
+        """個別アイテムで上書きする"""
+        pass
+
+    def draw(self, surface):
+        if self.active:
+            surface.blit(self.image, self.rect)
+
+class Juice(Item):
+    def __init__(self, x, y):
+        super().__init__(x, y, "fig/juice.png")
+
+    def apply_effect(self, player_rect, now, state):
+        if self.active and self.rect.colliderect(player_rect):
+            state["speed"] = 7
+            state["boost_timer"] = now + 5000
+            self.active = False
+
+class Timer(Item):
+    def __init__(self, x, y):
+        super().__init__(x, y, "fig/timer.png")
+
+    def apply_effect(self, player_rect, now, state):
+         if self.active and self.rect.colliderect(player_rect):
+            state["speed"] = 0.5
+            state["slow_timer"] = now + 3000
+            self.active = False
+
+class Mirror(Item):
+    def __init__(self, x, y):
+        super().__init__(x, y, "fig/mirror.png")
+
+    def apply_effect(self, player_rect, now, state):
+        if self.active and self.rect.colliderect(player_rect):
+            state["is_mirrored"] = True
+            state["mirror_timer"] = now + 4000  # 4秒後に戻す
+            self.active = False
+
+class Shield(Item):
+    def __init__(self, x, y):
+        super().__init__(x, y, "fig/shield.png")
+
+    def apply_effect(self, player_rect, now, state):
+        if self.active and self.rect.colliderect(player_rect):
+            state["has_shield"] = True
+            self.active = False
+
+
+# class Hamburger(Item):
+#     def __init__(self, x, y):
+#         super().__init__(x, y, "fig/hamburger.png")
+
+#     def apply_effect(self, player):
+#         if self.active and self.rect.colliderect(player.rect):
+#             print("Healed!")
+#             self.active = False
+
 
 def main():
     pg.display.set_caption("逃げろ！こうかとん")
     screen = pg.display.set_mode((WIDTH, HEIGHT))
 
     # こうかとん初期化
+    sum_mv = [0,0]
     bg_img = pg.image.load("fig/campas.jpg")    
-    kk_img = pg.transform.rotozoom(pg.image.load("fig/3.png"), 0, 0.9)
+    kk_img0 = pg.transform.rotozoom(pg.image.load("fig/3.png"), 0, 0.9)
+    kk_img = kk_img0 if sum_mv[0] >= 0 else pg.transform.flip(kk_img0, True, False)
     kk_rct = kk_img.get_rect()
     kk_rct.center = 300, 700
-    """
-    # 爆弾初期化
-    bb_imgs, bb_accs = init_bb_imgs()
-    bb_img = pg.Surface((20, 20))
-    pg.draw.circle(bb_img, (255, 0, 0), (10, 10), 10)
-    bb_rct = bb_img.get_rect()
-    bb_rct.center = random.randint(0, WIDTH), random.randint(0, HEIGHT)
-    bb_img.set_colorkey((0, 0, 0))
-    vx, vy = +5, +5 # 爆弾の速度
-    """
-    clock = pg.time.Clock()
+    reverse_icon = pg.image.load("fig/reverse.png").convert_alpha()
+    reverse_icon = pg.transform.scale(reverse_icon, (40, 40))
+    shield_icon = pg.image.load("fig/shield.png").convert_alpha()
+    shield_icon = pg.transform.scale(shield_icon, (35, 35))
+    barrier_img = pg.transform.scale(pg.image.load("fig/barrier.png"), (90, 80)) 
+    items = []
+
+    # 状態管理用の辞書（ブースト/鈍足/ミラーなど共通）
+    state = {
+    "speed": 3,
+    "boost_timer": 0,
+    "slow_timer": 0,
+    "is_mirrored": False,
+    "mirror_timer": 0,
+    "has_shield": False
+}
+
+    # 定期出現用のタイマー
+    SPAWN_INTERVAL = 3000
+    last_spawn_time = pg.time.get_ticks()
     tmr = 0
+
     while True:
         for event in pg.event.get():
             if event.type == pg.QUIT: 
                 return
         screen.blit(bg_img, [0, 0]) 
-        """
-         # 爆弾の拡大、加速
-        avx = vx*bb_accs[min(tmr//500, 9)]
-        avy = vy*bb_accs[min(tmr//500, 9)]
-        bb_img = bb_imgs[min(tmr//500, 9)]
-        bb_img.set_colorkey((0, 0, 0))
+        now = pg.time.get_ticks()
 
-         # こうかとんRectと爆弾Rectが重なっていたら
-        if kk_rct.colliderect(bb_rct):
-            gameover(screen)
-            time.sleep(5)
-            return
-        """
+        # こうかとんの操作
         key_lst = pg.key.get_pressed()
         sum_mv = [0, 0]
         for key, mv in DELTA.items():
             if key_lst[key]:
-                sum_mv[0] += mv[0] # 左右方向
-                #sum_mv[1] += mv[1] # 上下方向
-        """"
-        if key_lst[pg.K_UP]:
-            sum_mv[1] -= 5
-        if key_lst[pg.K_DOWN]:
-            sum_mv[1] += 5
-        if key_lst[pg.K_LEFT]:
-            sum_mv[0] -= 5
-        if key_lst[pg.K_RIGHT]:
-            sum_mv[0] += 5
-        """
-
-        kk_rct.move_ip(sum_mv) # こうかとんの移動
+                sum_mv[0] += mv[0] * state["speed"]# 左右方向
+                if state["is_mirrored"]:
+                    sum_mv[0] = -sum_mv[0]  # 反転
+        kk_rct.move_ip(sum_mv) # 移動
         if check_bound(kk_rct) != (True, True): # 画面外だったら
             kk_rct.move_ip(-sum_mv[0], -sum_mv[1]) # 画面内に戻す
         screen.blit(kk_img, kk_rct)
-        """"""
-        # #bb_rct.move_ip(avx, avy) # 爆弾の移動 
-        # yoko, tate = check_bound(bb_rct)
-        # if not yoko: # 左右どちらかにはみ出ていたら
-        #     vx *= -1
-        # if not tate: # 上下どちらかにはみ出ていたら
-        #     vy *= -1
+
+        # 一定時間後に速度を元に戻す
+        if state["boost_timer"] != 0 and now > state["boost_timer"]:
+            state["speed"] = 3
+            state["boost_timer"] = 0
+        if state["slow_timer"] != 0 and now > state["slow_timer"]:
+            state["speed"] = 3
+            state["slow_timer"] = 0
+        if state["mirror_timer"] != 0 and now > state["mirror_timer"]:
+            state["is_mirrored"] = False
+            state["mirror_timer"] = 0
         
-        #screen.blit(bb_img, bb_rct) # 爆弾の表示
+        # スピードアップ中効果トンをこうかとんを赤くする
+        draw_img = kk_img.copy()
+        if state["speed"] > 3:  # 速度アップ中
+            red_overlay = pg.Surface(kk_img.get_size())
+            red_overlay.fill((120, 0, 0))  # 赤色成分
+            draw_img.blit(red_overlay, (0, 0), special_flags=pg.BLEND_RGB_ADD)
+        screen.blit(draw_img, kk_rct)
+
+        # スロウ中に画面を暗くする 
+        if state["speed"] < 3:        
+            overlay = pg.Surface((WIDTH, HEIGHT))
+            overlay.fill((0, 80, 255))
+            overlay.set_alpha(40)    # 透明度
+            screen.blit(overlay, (0, 0))
+        
+        # 反転中にアイコンを表示する
+        if state["is_mirrored"]:
+            screen.blit(reverse_icon, (10, 10))
+        if state["mirror_timer"] > now:
+            font = pg.font.Font(None, 40)
+            remain = (state["mirror_timer"] - now) // 1000
+            txt = font.render(f"{remain}", True, (255,255,255))
+            screen.blit(txt, (50, 40))
+
+        # シールド発動中、バリアとシールドアイコン表示
+        if state["has_shield"]:
+             screen.blit(shield_icon, (WIDTH - 45, 10))
+             barrier_rect = barrier_img.get_rect(center=kk_rct.center)
+             screen.blit(barrier_img, barrier_rect)
+
+        # 一定時間ごとにランダムなアイテムを生成
+        if now - last_spawn_time > SPAWN_INTERVAL:
+            x = random.randint(0, WIDTH - 50)
+            # 確率に応じて選択
+            r = random.random()  # 0〜1の乱数を取得
+            if r < 0.45:
+                item = Juice(x, -40)
+            elif r < 0.85:
+                item = Timer(x, -40)
+            elif r < 0.95:
+                item = Mirror(x, -40)
+            else:
+                item = Shield(x, -40)
+            items.append(item)
+            # elif item_type == 'hamburger':
+            #     items.append(Hamburger(x, -40))
+            last_spawn_time = now
+
+
+        for item in items:
+            item.update()
+            item.apply_effect(kk_rct, now, state)
+            item.draw(screen)
+        items = [item for item in items if item.rect.y < HEIGHT and item.active]
+
         pg.display.update()
         tmr += 1
         clock.tick(50)
@@ -140,93 +245,3 @@ if __name__ == "__main__":
     main()
     pg.quit()
     sys.exit()
-# import os
-# import random
-# import sys
-# import time
-# import pygame as pg
-
-
-# WIDTH = 650  # ゲームウィンドウの幅
-# HEIGHT = 110  # ゲームウィンドウの高さ
-# NUM_OF_BOMBS = 5  # 爆弾の個数
-# os.chdir(os.path.dirname(os.path.abspath(__file__)))
-
-
-# class Bird:
-#     """
-#     ゲームキャラクター（こうかとん）に関するクラス
-#     """
-#     delta = {  # 押下キーと移動量の辞書
-#         pg.K_UP: (0, -5),
-#         pg.K_DOWN: (0, +5),
-#         pg.K_LEFT: (-5, 0),
-#         pg.K_RIGHT: (+5, 0),
-#     }
-#     img0 = pg.transform.rotozoom(pg.image.load("fig/campus.jpg"), 0, 0.9)
-#     img = pg.transform.flip(img0, True, False)  # デフォルトのこうかとん（右向き）
-#     imgs = {  # 0度から反時計回りに定義
-#         (+5, 0): img,  # 右
-#         (+5, -5): pg.transform.rotozoom(img, 45, 0.9),  # 右上
-#         (0, -5): pg.transform.rotozoom(img, 90, 0.9),  # 上
-#         (-5, -5): pg.transform.rotozoom(img0, -45, 0.9),  # 左上
-#         (-5, 0): img0,  # 左
-#         (-5, +5): pg.transform.rotozoom(img0, 45, 0.9),  # 左下
-#         (0, +5): pg.transform.rotozoom(img, -90, 0.9),  # 下
-#         (+5, +5): pg.transform.rotozoom(img, -45, 0.9),  # 右下
-#     }
-
-#     def __init__(self, xy: tuple[int, int]):
-#         """
-#         こうかとん画像Surfaceを生成する
-#         引数 xy：こうかとん画像の初期位置座標タプル
-#         """
-#         self.img = __class__.imgs[(+5, 0)]
-#         self.rct: pg.Rect = self.img.get_rect()
-#         self.rct.center = xy
-
-#     def change_img(self, num: int, screen: pg.Surface):
-#         """
-#         こうかとん画像を切り替え，画面に転送する
-#         引数1 num：こうかとん画像ファイル名の番号
-#         引数2 screen：画面Surface
-#         """
-#         self.img = pg.transform.rotozoom(pg.image.load(f"fig/{num}.png"), 0, 0.9)
-#         screen.blit(self.img, self.rct)
-
-#     def update(self, key_lst: list[bool], screen: pg.Surface):
-#         """
-#         押下キーに応じてこうかとんを移動させる
-#         引数1 key_lst：押下キーの真理値リスト
-#         引数2 screen：画面Surface
-#         """
-#         sum_mv = [0, 0]
-#         for k, mv in __class__.delta.items():
-#             if key_lst[k]:
-#                 sum_mv[0] += mv[0]
-#                 sum_mv[1] += mv[1]
-#         self.rct.move_ip(sum_mv)
-#         if check_bound(self.rct) != (True, True):
-#             self.rct.move_ip(-sum_mv[0], -sum_mv[1])
-#         if not (sum_mv[0] == 0 and sum_mv[1] == 0):
-#             self.img = __class__.imgs[tuple(sum_mv)]
-#         screen.blit(self.img, self.rct)
-
-      
-# def main():
-#     pg.display.set_caption("たたかえ！こうかとん")
-#     screen = pg.display.set_mode((WIDTH, HEIGHT))    
-#     bg_img = pg.image.load("fig/campus.jpg")
-#     bird = Bird((300, 200))
-#     tmr = 0
-#     while True:
-        
-        
-#         pg.display.update()
-
-
-# if __name__ == "__main__":
-#     pg.init()
-#     main()
-#     pg.quit()
-#     sys.exit()
