@@ -138,7 +138,7 @@ def main():
     walls =[]
     wall_type = ["obj_wall1", "obj_wall2", "obj_wall3"]
     random.shuffle(wall_type)
-    for i in range(5):  #壁の枚数を設定
+    for i in range(3):  #壁の枚数を設定
         walls.append(Wall(random.randint(0, WIDTH), random.randint(-500, -50), "fig/wall.png", wall_type[i % len(wall_type)], walls=walls))
         # 壁枚数分のwallオブジェクトを生成し、ランダムな壁をwallsリストに追加
     """
