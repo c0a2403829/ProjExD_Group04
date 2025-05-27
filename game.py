@@ -20,9 +20,49 @@ clock = pg.time.Clock()
 WALL_SPEED = 3
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
+
+class Gameover:
+    """
+    黒い画面にGame Overの文字とこうかとんを表示
+    その後画面を少しsleepさせる
+    """
+    def __init__(self,survive_time):
+        self.bl_img = pg.Surface((WIDTH*2,HEIGHT*2)) #黒い画面を描画
+        self.bl_img.set_alpha(200)
+        pg.draw.rect(self.bl_img,(0, 0, 0),pg.Rect(0,0,WIDTH,HEIGHT))
+        self.bl_rct = self.bl_img.get_rect()
+        self.bl_rct.center = (WIDTH,HEIGHT)
+
+        self.fonto = pg.font.Font(None, 60) # 文字列表示
+        self.txt = self.fonto.render("Game Over",True, (255, 255, 255))
+
+        self.time_fonto = pg.font.Font(None, 50) # 文字列表示
+        self.time_txt = self.time_fonto.render(f"{survive_time}seconds left",True, (255, 255, 255)) 
+
+        self.kk_img1 = pg.image.load("fig/8.png") # こうかとん(左)表示 
+        self.kk_img1 = pg.transform.rotozoom(pg.image.load("fig/8.png"), 0, 2.0)
+        self.kk_rct1 = self.kk_img1.get_rect()
+        self.kk_rct1.center = 135, HEIGHT/2+30
+
+        self.kk_img2 = pg.image.load("fig/8.png") # こうかとん(右)表示 
+        self.kk_img2 = pg.transform.rotozoom(pg.image.load("fig/8.png"), 0, 2.0)
+        self.kk_rct2 = self.kk_img1.get_rect()
+        self.kk_rct2.center = 470, HEIGHT/2+30
+        
+
+    def update(self,screen: pg.Surface):
+        screen.blit(self.bl_img,self.bl_rct)
+        screen.blit(self.txt, [180,HEIGHT/2-20])
+        screen.blit(self.time_txt, [170,500])
+        screen.blit(self.kk_img1, self.kk_rct1)
+        screen.blit(self.kk_img2, self.kk_rct2)
+        pg.display.update()
+        time.sleep(5)
+
+
 def check_bound(rct: pg.Rect) -> tuple[bool, bool]:
     """
-    引数：こうかとんRectまたは爆弾Rect
+    引数：こうかとんRect
     戻り値：判定結果タプル（横、縦）
     画面内ならTrue、画面外ならFalse
     """
@@ -33,6 +73,7 @@ def check_bound(rct: pg.Rect) -> tuple[bool, bool]:
     if rct.top < 0 or HEIGHT < rct.bottom: # 画面外だったら
         tate = False
     return yoko, tate
+
 
 class Item:
     """
@@ -94,6 +135,7 @@ class Shield(Item):
     def apply_effect(self, player_rect, now, state):
         if self.active and self.rect.colliderect(player_rect):
             state["has_shield"] = True
+            state["shield_timer"] = now + 10000
             self.active = False
 
 def init_bb_imgs() -> tuple[list[pg.Surface], list[int]]: # 爆弾拡大、加速機能
@@ -181,8 +223,14 @@ class Wall:
             self.image = pg.transform.scale(self.image, (self.image.get_width() // 4, self.image.get_height() // 4))
         elif form == "obj_wall2":
             self.image = pg.transform.scale(self.image, (self.image.get_width() // 8, self.image.get_height() // 4))
+            self.rect = self.image.get_rect()
+            self.rect.height *= 2
+            self.rect.centery -= self.image.get_height() // 2
         elif form == "obj_wall3":
             self.image = pg.transform.scale(self.image, (self.image.get_width() // 4, self.image.get_height() // 8))
+            self.rect = self.image.get_rect()
+            self.rect.width *= 2
+            self.rect.centerx -= self.image.get_width() // 2
 
         self.form = form
         self.speed = speed
@@ -246,6 +294,7 @@ def main():
     kk_rct = kk_img.get_rect()
 
     kk_rct.center = 300, 700
+  
 
     reverse_icon = pg.image.load("fig/reverse.png").convert_alpha()
     reverse_icon = pg.transform.scale(reverse_icon, (40, 40))
@@ -256,12 +305,13 @@ def main():
 
     # 状態管理用の辞書（ブースト/鈍足/ミラーなど共通）
     state = {
-    "speed": 3,
+    "speed": 2,
     "boost_timer": 0,
     "slow_timer": 0,
     "is_mirrored": False,
     "mirror_timer": 0,
-    "has_shield": False
+    "has_shield": False,
+    "shield_timer": 0,
 }
 
     # 定期出現用のタイマー
@@ -280,6 +330,7 @@ def main():
     for i in range(4):  #壁の枚数を設定
         walls.append(Wall(random.randint(0, WIDTH), random.randint(-500, -50), "fig/wall.png", wall_type[i % len(wall_type)], walls=walls))
         # 壁枚数分のwallオブジェクトを生成し、ランダムな壁をwallsリストに追加
+
     clock = pg.time.Clock()
     tmr = 0
 
@@ -287,6 +338,7 @@ def main():
 
         elapsed_time = time.time() - start_time
         survive_time = max(0, int(180 - elapsed_time)) #カウントダウン
+
 
         if survive_time <= 0:
              game_clear(screen)#ゲームクリア画面呼び出し
@@ -296,13 +348,32 @@ def main():
         for event in pg.event.get():
             if event.type == pg.QUIT: 
                 return
-            
+
+                
         now = pg.time.get_ticks()
 
         # こうかとんの操作
             
         screen.blit(bg_img, [-570, 0]) 
         
+        
+        for wall1 in walls:
+            if kk_rct.colliderect(wall1.rect): # 壁1に合った判定確認
+                if state["has_shield"] == False:
+                    pg.mixer.music.load("fig/打撃4.mp3") #  壁1に当たったときの音を鳴らす
+                    pg.mixer.music.play(loops=0, start=0.0)
+                    game.update(screen)  
+                    return
+        # for wall1 in walls:
+        #     wall1.update(screen)
+
+
+
+        kk_rct.move_ip(sum_mv) # こうかとんの移動
+        if check_bound(kk_rct) != (True, True): # 画面外だったら
+            kk_rct.move_ip(-sum_mv[0], -sum_mv[1]) # 画面内に戻す
+        screen.blit(kk_img, kk_rct)
+
         key_lst = pg.key.get_pressed()
         sum_mv = [0, 0]
         for key, mv in DELTA.items():
@@ -326,15 +397,18 @@ def main():
         if state["mirror_timer"] != 0 and now > state["mirror_timer"]:
             state["is_mirrored"] = False
             state["mirror_timer"] = 0
+        if state["shield_timer"] != 0 and now > state["shield_timer"]:
+            state["has_shield"] = False
+            state["shield_timer"] = 0
 
         """
         右上にカウントダウン表示
         """
         timer_font = pg.font.SysFont("impact", 40)
         timer_txt = timer_font.render(f"Survive for {survive_time} more seconds!", True, (244,229,17))
-        screen.blit(timer_txt, (70, 750))
+        screen.blit(timer_txt, (70, 200))
 
-        
+        game = Gameover(survive_time)
 
         # スピードアップ中効果トンをこうかとんを赤くする
         draw_img = kk_img.copy()
@@ -371,12 +445,12 @@ def main():
             x = random.randint(0, WIDTH - 50)
             # 確率に応じて選択
             r = random.random()  # 0〜1の乱数を取得
-            if r < 0.45:
+            if r < 0.1:
                 item = Juice(x, -40)
-            elif r < 0.85:
-                item = Timer(x, -40)
-            elif r < 0.95:
-                item = Mirror(x, -40)
+            # elif r < 0.85:
+            #     item = Timer(x, -40)
+            # elif r < 0.95:
+            #     item = Mirror(x, -40)
             else:
                 item = Shield(x, -40)
             items.append(item)
