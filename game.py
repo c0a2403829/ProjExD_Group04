@@ -6,20 +6,16 @@ import pygame.mixer
 import pygame as pg
 
 
-DELTA = {  # 押下キーと移動量の辞書
-        pg.K_UP: (0, -5),
-        pg.K_DOWN: (0, +5),
-        pg.K_LEFT: (-5, 0),
-        pg.K_RIGHT: (+5, 0),
-    }
 WIDTH, HEIGHT = 600, 800
 clock = pg.time.Clock()
-
-
-
 WALL_SPEED = 3
-os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
+DELTA = { # 辞書の作成
+    pg.K_LEFT: (-5,0),
+    pg.K_RIGHT: (+5,0),
+}
+
+os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
 class Gameover:
     """
@@ -49,7 +45,6 @@ class Gameover:
         self.kk_rct2 = self.kk_img1.get_rect()
         self.kk_rct2.center = 470, HEIGHT/2+30
         
-
     def update(self,screen: pg.Surface):
         screen.blit(self.bl_img,self.bl_rct)
         screen.blit(self.txt, [180,HEIGHT/2-20])
@@ -58,7 +53,6 @@ class Gameover:
         screen.blit(self.kk_img2, self.kk_rct2)
         pg.display.update()
         time.sleep(5)
-
 
 def check_bound(rct: pg.Rect) -> tuple[bool, bool]:
     """
@@ -104,7 +98,8 @@ class Juice(Item):
 
     def apply_effect(self, player_rect, now, state):
         if self.active and self.rect.colliderect(player_rect):
-            state["speed"] = 7
+            state["speedup"] = True
+            state["speed"] = 2
             state["boost_timer"] = now + 5000
             self.active = False
 
@@ -114,7 +109,7 @@ class Timer(Item):
 
     def apply_effect(self, player_rect, now, state):
          if self.active and self.rect.colliderect(player_rect):
-            state["speed"] = 0.5
+            state["speed"] = 0.4
             state["slow_timer"] = now + 3000
             self.active = False
 
@@ -135,7 +130,7 @@ class Shield(Item):
     def apply_effect(self, player_rect, now, state):
         if self.active and self.rect.colliderect(player_rect):
             state["has_shield"] = True
-            state["shield_timer"] = now + 10000
+            state["shield_timer"] = now + 8000
             self.active = False
 
 def init_bb_imgs() -> tuple[list[pg.Surface], list[int]]: # 爆弾拡大、加速機能
@@ -208,7 +203,6 @@ def game_clear(screen: pg.Surface):
                 return
 
 
-
 class Wall:
     def __init__(self, x, y, image_path, form="obj_wall1", speed=WALL_SPEED, walls=[]):
         """
@@ -235,7 +229,6 @@ class Wall:
         self.form = form
         self.speed = speed
         self.rect = self.image.get_rect()
-
         self.rect.topleft = self.safe_position(x, y, walls)
     
     def safe_position(self, x, y, walls):
@@ -272,12 +265,8 @@ class Wall:
         """
         wall2,wall3をそれぞれ、画像を縦、横に並べたものにする
         """
-        screen.blit(self.image, self.rect)
-        if self.form == "obj_wall2":
-            screen.blit(self.image, (self.rect.x, self.rect.y + self.image.get_height()))
-        elif self.form =="obj_wall3":
-            screen.blit(self.image, (self.rect.x + self.image.get_width(), self.rect.y))
-            
+        screen.blit(self.image, self.rect)     
+
 
 def main():
     pg.display.set_caption("生き延びろ！こうかとん")
@@ -292,10 +281,7 @@ def main():
     kk_img0 = pg.transform.rotozoom(pg.image.load("fig/3.png"), 0, 0.9)
     kk_img = kk_img0 if sum_mv[0] >= 0 else pg.transform.flip(kk_img0, True, False)
     kk_rct = kk_img.get_rect()
-
     kk_rct.center = 300, 700
-  
-
     reverse_icon = pg.image.load("fig/reverse.png").convert_alpha()
     reverse_icon = pg.transform.scale(reverse_icon, (40, 40))
     shield_icon = pg.image.load("fig/shield.png").convert_alpha()
@@ -305,7 +291,8 @@ def main():
 
     # 状態管理用の辞書（ブースト/鈍足/ミラーなど共通）
     state = {
-    "speed": 2,
+    "speedup" : False,
+    "speed": 0.8,
     "boost_timer": 0,
     "slow_timer": 0,
     "is_mirrored": False,
@@ -318,12 +305,10 @@ def main():
     SPAWN_INTERVAL = 3000
     last_spawn_time = pg.time.get_ticks()
 
-
     pygame.mixer.init() #初期化
     pygame.mixer.music.load("fig/The_Beautiful_Haven_Type_I.mp3") #読み込み
     pygame.mixer.music.play(1) #ゲーム画面BGM再生
     
-
     walls =[]
     wall_type = ["obj_wall1", "obj_wall2", "obj_wall3"]
     random.shuffle(wall_type)
@@ -333,12 +318,21 @@ def main():
 
     clock = pg.time.Clock()
     tmr = 0
+  
+    scale=0.9
+    kk_base_img=pg.image.load("fig/3.png")
+    kk_img = pg.transform.rotozoom(kk_base_img, 0, scale)
+    kk_rct = kk_img.get_rect()
+    kk_rct.center = 300, 700
+    
+    clock = pg.time.Clock()
+    tmr = 0
+    speed = 1 
 
     while True:
 
         elapsed_time = time.time() - start_time
         survive_time = max(0, int(180 - elapsed_time)) #カウントダウン
-
 
         if survive_time <= 0:
              game_clear(screen)#ゲームクリア画面呼び出し
@@ -348,15 +342,10 @@ def main():
         for event in pg.event.get():
             if event.type == pg.QUIT: 
                 return
-
-                
+   
         now = pg.time.get_ticks()
 
-        # こうかとんの操作
-            
         screen.blit(bg_img, [-570, 0]) 
-        
-        
         for wall1 in walls:
             if kk_rct.colliderect(wall1.rect): # 壁1に合った判定確認
                 if state["has_shield"] == False:
@@ -364,11 +353,14 @@ def main():
                     pg.mixer.music.play(loops=0, start=0.0)
                     game.update(screen)  
                     return
-        # for wall1 in walls:
-        #     wall1.update(screen)
 
+        elapsed_sec = tmr // 50
+        scale = 0.9 + 0.2 * (elapsed_sec // 20)  # 10秒ごとにサイズアップ
+        kk_img = pg.transform.rotozoom(kk_base_img, 0, scale)
+        kk_rct = kk_img.get_rect(center=kk_rct.center) 
+        speed = 1 + elapsed_sec // 20
 
-
+        # こうかとんの操作  
         kk_rct.move_ip(sum_mv) # こうかとんの移動
         if check_bound(kk_rct) != (True, True): # 画面外だったら
             kk_rct.move_ip(-sum_mv[0], -sum_mv[1]) # 画面内に戻す
@@ -386,13 +378,13 @@ def main():
             kk_rct.move_ip(-sum_mv[0], -sum_mv[1]) # 画面内に戻す
         screen.blit(kk_img, kk_rct)
 
-
         # 一定時間後に速度を元に戻す
         if state["boost_timer"] != 0 and now > state["boost_timer"]:
-            state["speed"] = 3
+            state["speed"] = 2
             state["boost_timer"] = 0
+            state["speedup"] = False
         if state["slow_timer"] != 0 and now > state["slow_timer"]:
-            state["speed"] = 3
+            state["speed"] = 2
             state["slow_timer"] = 0
         if state["mirror_timer"] != 0 and now > state["mirror_timer"]:
             state["is_mirrored"] = False
@@ -412,14 +404,14 @@ def main():
 
         # スピードアップ中効果トンをこうかとんを赤くする
         draw_img = kk_img.copy()
-        if state["speed"] > 3:  # 速度アップ中
+        if state["speedup"] == True:  # 速度アップ中
             red_overlay = pg.Surface(kk_img.get_size())
             red_overlay.fill((120, 0, 0))  # 赤色成分
             draw_img.blit(red_overlay, (0, 0), special_flags=pg.BLEND_RGB_ADD)
         screen.blit(draw_img, kk_rct)
 
         # スロウ中に画面を暗くする 
-        if state["speed"] < 3:        
+        if state["speed"] < 0.8:        
             overlay = pg.Surface((WIDTH, HEIGHT))
             overlay.fill((0, 80, 255))
             overlay.set_alpha(40)    # 透明度
@@ -445,19 +437,18 @@ def main():
             x = random.randint(0, WIDTH - 50)
             # 確率に応じて選択
             r = random.random()  # 0〜1の乱数を取得
-            if r < 0.1:
+            if r < 0.45:
                 item = Juice(x, -40)
-            # elif r < 0.85:
-            #     item = Timer(x, -40)
-            # elif r < 0.95:
-            #     item = Mirror(x, -40)
+            elif r < 0.85:
+                item = Timer(x, -40)
+            elif r < 0.95:
+                item = Mirror(x, -40)
             else:
                 item = Shield(x, -40)
             items.append(item)
             # elif item_type == 'hamburger':
             #     items.append(Hamburger(x, -40))
             last_spawn_time = now
-
 
         for item in items:
             item.update()
