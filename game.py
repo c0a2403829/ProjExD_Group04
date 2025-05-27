@@ -14,6 +14,10 @@ DELTA = {  # 押下キーと移動量の辞書
     }
 WIDTH, HEIGHT = 600, 800
 clock = pg.time.Clock()
+
+
+
+WALL_SPEED = 3
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
 def check_bound(rct: pg.Rect) -> tuple[bool, bool]:
@@ -163,6 +167,70 @@ def game_clear(screen: pg.Surface):
 
 
 
+class Wall:
+    def __init__(self, x, y, image_path, form="obj_wall1", speed=WALL_SPEED, walls=[]):
+        """
+        シンプルな画像一枚と縦に二枚重ねたとき横に二枚並べたときの三種類の大きさ調整
+        画像の情報取得
+        基本情報の設定
+        壁同士が重ならない位置に壁を配置
+        """
+        self.image = pg.image.load(image_path)
+        
+        if form == "obj_wall1":
+            self.image = pg.transform.scale(self.image, (self.image.get_width() // 4, self.image.get_height() // 4))
+        elif form == "obj_wall2":
+            self.image = pg.transform.scale(self.image, (self.image.get_width() // 8, self.image.get_height() // 4))
+        elif form == "obj_wall3":
+            self.image = pg.transform.scale(self.image, (self.image.get_width() // 4, self.image.get_height() // 8))
+
+        self.form = form
+        self.speed = speed
+        self.rect = self.image.get_rect()
+
+        self.rect.topleft = self.safe_position(x, y, walls)
+    
+    def safe_position(self, x, y, walls):
+        """
+        壁同士の出力場所の重複を防止
+        coolliderect(a)はaと座標が重なったらループを抜ける、
+        抜けた場合ランダムに座標を付けなおす
+        戻り値：ランダムなx,y座標
+        """
+        trying = 100
+        for i in range(trying):
+            tr_rect = self.rect.copy()
+            tr_rect.topleft = (x, y)
+            coll = False
+            for w in walls:
+                if tr_rect.colliderect(w.rect):
+                    coll = True
+                    break
+            if not coll:
+                return x, y
+            x = random.randint(0,WIDTH - self.rect.width)
+            y = random.randint(-500, -50)
+        return x, y
+    
+    def move(self, walls):
+        """
+        壁の位置を下に下げていき画面外に消えたときに画面上部のランダムな位置からまた落ち始める
+        """
+        self.rect.y += self.speed
+        if self.rect.y > HEIGHT:
+            self.rect.topleft = self.safe_position(random.randint(0, WIDTH - self.rect.width), random.randint(-500, -50), walls)
+
+    def draw(self, screen):
+        """
+        wall2,wall3をそれぞれ、画像を縦、横に並べたものにする
+        """
+        screen.blit(self.image, self.rect)
+        if self.form == "obj_wall2":
+            screen.blit(self.image, (self.rect.x, self.rect.y + self.image.get_height()))
+        elif self.form =="obj_wall3":
+            screen.blit(self.image, (self.rect.x + self.image.get_width(), self.rect.y))
+            
+
 def main():
     pg.display.set_caption("生き延びろ！こうかとん")
     screen = pg.display.set_mode((WIDTH, HEIGHT))
@@ -205,6 +273,13 @@ def main():
     pygame.mixer.music.load("fig/The_Beautiful_Haven_Type_I.mp3") #読み込み
     pygame.mixer.music.play(1) #ゲーム画面BGM再生
     
+
+    walls =[]
+    wall_type = ["obj_wall1", "obj_wall2", "obj_wall3"]
+    random.shuffle(wall_type)
+    for i in range(4):  #壁の枚数を設定
+        walls.append(Wall(random.randint(0, WIDTH), random.randint(-500, -50), "fig/wall.png", wall_type[i % len(wall_type)], walls=walls))
+        # 壁枚数分のwallオブジェクトを生成し、ランダムな壁をwallsリストに追加
     clock = pg.time.Clock()
     tmr = 0
 
@@ -260,6 +335,7 @@ def main():
         screen.blit(timer_txt, (70, 750))
 
         
+
         # スピードアップ中効果トンをこうかとんを赤くする
         draw_img = kk_img.copy()
         if state["speed"] > 3:  # 速度アップ中
@@ -315,6 +391,10 @@ def main():
             item.draw(screen)
         items = [item for item in items if item.rect.y < HEIGHT and item.active]
 
+        for wall in walls:
+            wall.move(walls)
+            wall.draw(screen)
+            
         pg.display.update()
         tmr += 1
         clock.tick(50)
