@@ -47,7 +47,7 @@ class Item:
     """
     アイテムに関するクラス
     """
-    def __init__(self, x, y, image_path, fall_speed=5):
+    def __init__(self, x, y, image_path, fall_speed=3):
         self.image = pg.transform.scale(pg.image.load(image_path).convert_alpha(),(50,45))
         self.rect = self.image.get_rect(topleft=(x, y))
         self.active = True
@@ -103,6 +103,7 @@ class Shield(Item):
     def apply_effect(self, player_rect, now, state):
         if self.active and self.rect.colliderect(player_rect):
             state["has_shield"] = True
+            state["shield_timer"] = now + 10000
             self.active = False
 
 
@@ -141,7 +142,8 @@ def main():
     "slow_timer": 0,
     "is_mirrored": False,
     "mirror_timer": 0,
-    "has_shield": False
+    "has_shield": False,
+    "shield_timer": 0
 }
 
     # 定期出現用のタイマー
@@ -179,6 +181,9 @@ def main():
         if state["mirror_timer"] != 0 and now > state["mirror_timer"]:
             state["is_mirrored"] = False
             state["mirror_timer"] = 0
+        if state["shild_timer"] != 0 and now > state["shild_timer"]:
+            state["has_shild"] = False
+            state["shild_timer"] = 0
         
         # スピードアップ中効果トンをこうかとんを赤くする
         draw_img = kk_img.copy()
