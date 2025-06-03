@@ -73,7 +73,7 @@ class Item:
     """
     アイテムに関するクラス
     """
-    def __init__(self, x, y, image_path, fall_speed=3):
+    def __init__(self, x, y, image_path, fall_speed=5):
         self.image = pg.transform.scale(pg.image.load(image_path).convert_alpha(),(50,45))
         self.rect = self.image.get_rect(topleft=(x, y))
         self.active = True
